@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neuralnet"
+version = "0.1.0"
+description = "smol neural network framework i made because i was bored"
+dependencies = ["numpy"]
+
+[tool.setuptools.packages.find]
+where = ["."]
