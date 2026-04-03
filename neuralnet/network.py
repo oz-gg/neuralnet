@@ -1,19 +1,20 @@
 import numpy as np
 import time
-from typing import Literal
+from typing import Literal, List, Tuple
 
 from .activations import build_activation_registry
 
 class NeuralNetwork:
 	def __init__(
 		self,
-		layers: list[int],
+		layers: List[Tuple[int, Literal["relu", "leaky_relu", "elu", "tanh", "softsign", "swish", None]]],
 		cuda: bool = True,
-		activation: Literal["relu", "leaky_relu", "elu", "tanh", "softsign", "swish"] = "relu"
 	):
+		self.is_cupy = False
 		if cuda:
 			try:
 				import cupy as xp
+				self.is_cupy = True
 			except ImportError:
 				print("CuPy not found, falling back to NumPy")
 				import numpy as xp
@@ -26,17 +27,19 @@ class NeuralNetwork:
 		self.biases = []
 
 		activs = build_activation_registry(self.xp)
-		if activation not in activs:
-			raise ValueError(f"Invalid activation: {activation}")
 
-		self.activation, self.deriv = activs[activation]
+		self.activation, self.deriv = [], []
+		for layer in layers:
+			_a, _d = activs[layer[1]]
+			self.activation.append(_a)
+			self.deriv.append(_d)
 
 		self.xp.random.seed(1)
 		for i in range(len(layers) - 1):
 			self.weights.append(
-				self.xp.random.randn(layers[i], layers[i + 1]) * self.xp.sqrt(2 / layers[i])
+				self.xp.random.randn(layers[i][0], layers[i + 1][0]) * self.xp.sqrt(2 / layers[i][0])
 			)
-			self.biases.append(self.xp.zeros((1, layers[i + 1])))
+			self.biases.append(self.xp.zeros((1, layers[i + 1][0])))
 
 	def forward(self, X):
 		if not isinstance(X, self.xp.ndarray):
@@ -48,12 +51,12 @@ class NeuralNetwork:
 
 		for i in range(len(self.weights) - 1):
 			z = a.dot(self.weights[i]) + self.biases[i]
-			a = self.activation(z)
+			a = self.activation[i](z)
 			self.zs.append(z)
 			self.activations.append(a)
 
 		z = a.dot(self.weights[-1]) + self.biases[-1]
-		a = z
+		a = self.activation[-1](z)
 		self.zs.append(z)
 		self.activations.append(a)
 
@@ -71,7 +74,7 @@ class NeuralNetwork:
 			dbs[i] = self.xp.sum(d, axis=0, keepdims=True)
 
 			if i > 0:
-				d = d.dot(self.weights[i].T) * self.deriv(self.zs[i - 1])
+				d = d.dot(self.weights[i].T) * self.deriv[i](self.zs[i - 1])
 				norm = self.xp.sqrt(self.xp.sum(d * d))
 				if norm > largest_norm:
 					largest_norm = norm
@@ -139,10 +142,9 @@ class NeuralNetwork:
 		w_obj = np.empty(len(weights), dtype=object)
 		b_obj = np.empty(len(biases), dtype=object)
 
-		is_cupy = self.xp.__name__ == "cupy"
 		for i in range(len(weights)):
-			w_obj[i] = self.xp.asnumpy(weights[i]) if is_cupy else weights[i]
-			b_obj[i] = self.xp.asnumpy(biases[i]) if is_cupy else biases[i]
+			w_obj[i] = self.xp.asnumpy(weights[i]) if self.is_cupy else weights[i]
+			b_obj[i] = self.xp.asnumpy(biases[i]) if self.is_cupy else biases[i]
 
 		np.savez(filename, weights=w_obj, biases=b_obj)
 

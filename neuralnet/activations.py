@@ -35,6 +35,9 @@ def softsign_deriv(xp):
 def swish_deriv(xp):
 	return lambda x: (lambda sig: sig + x * sig * (1 - sig))(1 / (1 + xp.exp(-x)))
 
+def empty():
+	return lambda x: x
+
 
 def build_activation_registry(xp):
 	return {
@@ -44,4 +47,5 @@ def build_activation_registry(xp):
 		"tanh": (tanh(xp), tanh_deriv(xp)),
 		"softsign": (softsign(xp), softsign_deriv(xp)),
 		"swish": (swish(xp), swish_deriv(xp)),
+		None: (empty(), empty())
 	}
