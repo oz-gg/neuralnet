@@ -16,7 +16,6 @@ def softsign(xp):
 def swish(xp):
 	return lambda x: x / (1 + xp.exp(-x))
 
-
 def relu_deriv(xp):
 	return lambda x: (x > 0).astype(xp.float32)
 
