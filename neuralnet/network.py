@@ -82,7 +82,7 @@ class NeuralNetwork:
 				if norm > largest_norm:
 					largest_norm = norm
 				if norm > norm_threshold:
-					d = d * (norm_threshold / norm + 1e-8)
+					d = d * (norm_threshold / (norm + 1e-8))
 
 		return dws, dbs, largest_norm
 
