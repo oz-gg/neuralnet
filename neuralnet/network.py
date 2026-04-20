@@ -100,7 +100,7 @@ class NeuralNetwork:
 
 		best_weights = [w.copy() for w in self.weights]
 		best_biases = [b.copy() for b in self.biases]
-		best_loss = None
+		best_loss = np.inf
 
 		split = int(train_split * len(X))
 		X_train, X_val = X[:split], X[split:]
@@ -141,10 +141,13 @@ class NeuralNetwork:
 			reg_loss = (self.lambda_l2 / 2) * self.l2_loss()
 			epoch_loss += reg_loss
 
-			vals, _, _ = self.forward(X_val)
-			val_loss = self.loss_fn(vals, y_val)
+			if X_val.shape[0] != 0:
+				vals, _, _ = self.forward(X_val)
+				val_loss = self.loss_fn(vals, y_val)
+			else:
+				val_loss = epoch_loss
 
-			if best_loss is None or val_loss < best_loss:
+			if best_loss is None or val_loss < best_loss or val_loss == np.inf:
 				best_loss = val_loss
 				best_weights = [w.copy() for w in self.weights]
 				best_biases = [b.copy() for b in self.biases]
