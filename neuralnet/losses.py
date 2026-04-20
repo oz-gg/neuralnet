@@ -3,7 +3,7 @@ def mse(xp):
 		return xp.mean((y_pred - y_true) ** 2)
 	
 	def grad(y_pred, y_true):
-		return 2 * (y_pred - y_true) / y_true.shape[0]
+		return 2 * (y_pred - y_true) / y_true.size
 	
 	return loss, grad
 
@@ -12,7 +12,7 @@ def mae(xp):
 		return xp.mean(xp.abs(y_pred - y_true))
 	
 	def grad(y_pred, y_true):
-		return xp.sign(y_pred - y_true) / y_true.shape[0]
+		return xp.sign(y_pred - y_true) / y_true.size
 	
 	return loss, grad
 
@@ -25,7 +25,7 @@ def cross_entropy(xp):
 	def grad(y_pred, y_true):
 		eps = 1e-12
 		y_pred = xp.clip(y_pred, eps, eps - 1)
-		return (y_pred - y_true) / y_true.shape[0]
+		return (y_pred - y_true) / y_true.size
 	
 	return loss, grad
 

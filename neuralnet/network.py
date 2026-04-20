@@ -51,42 +51,38 @@ class NeuralNetwork:
 		if not isinstance(X, self.xp.ndarray):
 			X = self.xp.array(X)
 
-		self.activations = [X]
-		self.zs = []
+		zs = []
+		acts = [X]
 		a = X
 
-		for i in range(len(self.weights) - 1):
+		for i in range(len(self.weights)):
 			z = a @ self.weights[i] + self.biases[i]
 			a = self.activation[i](z)
-			self.zs.append(z)
-			self.activations.append(a)
+			zs.append(z)
+			acts.append(a)
 
-		z = a @ self.weights[-1] + self.biases[-1]
-		a = self.activation[-1](z)
-		self.zs.append(z)
-		self.activations.append(a)
+		return a, zs, acts
 
-		return a
-
-	def backward(self, y, norm_threshold):
+	def backward(self, y, norm_threshold, cache):
 		dws = [None] * len(self.weights)
 		dbs = [None] * len(self.biases)
 
-		d = self.loss_grad(self.activations[-1], y)
+		zs, acts = cache
+		d = self.loss_grad(acts[-1], y)
 		largest_norm = -1
 
 		for i in reversed(range(len(self.weights))):
-			dws[i] = self.activations[i].T.dot(d)
-			dws[i] += 2 * self.lambda_l2 * self.weights[i] # l2
+			dws[i] = acts[i].T.dot(d)
+			dws[i] += self.lambda_l2 * self.weights[i]
 			dbs[i] = self.xp.sum(d, axis=0, keepdims=True)
 
 			if i > 0:
-				d = d.dot(self.weights[i].T) * self.deriv[i](self.zs[i - 1])
+				d = d.dot(self.weights[i].T) * self.deriv[i](zs[i])
 				norm = self.xp.sqrt(self.xp.sum(d * d))
 				if norm > largest_norm:
 					largest_norm = norm
 				if norm > norm_threshold:
-					d = d * (norm_threshold / norm)
+					d = d * (norm_threshold / norm + 1e-8)
 
 		return dws, dbs, largest_norm
 
@@ -129,22 +125,27 @@ class NeuralNetwork:
 				y_batch = y_shuffled[i:i+batch_size]
 				current_batch_size = X_batch.shape[0]
 
-				out = self.forward(X_batch)
-				epoch_loss += self.loss_fn(y_batch, out) * current_batch_size
-				
-				dws, dbs, norm = self.backward(y_batch, norm_threshold)
-				max_norm = max(max_norm, float(norm))
-				
+				out, zs, acts = self.forward(X_batch)
+				data_loss = self.loss_fn(y_batch, out)
+				epoch_loss += data_loss * current_batch_size
 				total_samples += current_batch_size
+				
+				dws, dbs, norm = self.backward(y_batch, norm_threshold, (zs, acts))
+				max_norm = max(max_norm, float(norm))
 
 				for j in range(len(self.weights)):
 					self.weights[j] -= lr * dws[j]
 					self.biases[j] -= lr * dbs[j]
 			
-			epoch_loss = (epoch_loss + self.l2_loss() * self.lambda_l2) / total_samples
+			epoch_loss = epoch_loss / total_samples
+			reg_loss = (self.lambda_l2 / 2) * self.l2_loss()
+			epoch_loss += reg_loss
 
-			if best_loss is None or epoch_loss < best_loss:
-				best_loss = epoch_loss
+			vals, _, _ = self.forward(X_val)
+			val_loss = self.loss_fn(vals, y_val)
+
+			if best_loss is None or val_loss < best_loss:
+				best_loss = val_loss
 				best_weights = [w.copy() for w in self.weights]
 				best_biases = [b.copy() for b in self.biases]
 
@@ -170,8 +171,6 @@ class NeuralNetwork:
 				break
 
 		self.save_weights(save_filename, best_weights, best_biases)
-		vals = self.forward(X_val)
-		val_loss = self.loss_fn(vals, y_val)
 		print(f"Completed training with a training loss of {float(best_loss):.6f} and validation loss of {float(val_loss):.6f}")
 
 	def save_weights(self, filename, weights, biases):
